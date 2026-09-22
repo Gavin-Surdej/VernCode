@@ -1,0 +1,1138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VernCode - VS Code Python Runner</title>
+
+    <!-- LOCAL OFFLINE LIBRARIES -->
+    <!-- Tailwind CSS for styling -->
+    <script src="lib/tailwind.js"></script>
+    
+    <!-- Skulpt for Python Execution -->
+    <script src="lib/skulpt.min.js"></script>
+    <script src="lib/skulpt-stdlib.js"></script>
+
+    <!-- Ace Editor -->
+    <script src="lib/ace/ace.js"></script>
+    
+    <!-- Phosphor Icons for a clean VS Code look -->
+    <link rel="stylesheet" type="text/css" href="lib/phosphor/regular.css">
+    <link rel="stylesheet" type="text/css" href="lib/phosphor/fill.css">
+
+    <style>
+        /* Base VS Code Colors */
+        :root {
+            --bg-dark: #1e1e1e;
+            --bg-sidebar: #252526;
+            --bg-activity-bar: #333333;
+            --bg-panel: #1e1e1e;
+            --border-color: #3c3c3c;
+            --text-main: #cccccc;
+            --text-muted: #858585;
+            --accent-blue: #007acc;
+            --hover-bg: #2a2d2e;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+
+        /* Scrollbars matching VS Code */
+        ::-webkit-scrollbar {
+            width: 12px;
+            height: 12px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #464646;
+            border: 3px solid var(--bg-dark);
+            border-radius: 6px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555555;
+        }
+
+        /* Editor specific styling */
+        #editor {
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 14px;
+        }
+
+        /* UI Overlay Modals */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(2px);
+        }
+
+        .modal-box {
+            background: #252526;
+            border: 1px solid #3c3c3c;
+            border-radius: 6px;
+            width: 400px;
+            max-width: 90%;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            color: #cccccc;
+        }
+
+        /* Floating "Window" for Turtle Graphics */
+        #turtle-window-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(2px);
+        }
+
+        #turtle-window {
+            background: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            max-width: 90vw;
+            max-height: 90vh;
+            min-width: 400px;
+            min-height: 300px;
+            transition: all 0.2s ease-in-out;
+        }
+
+        #turtle-window.maximized {
+            width: 100%;
+            height: 100%;
+            max-width: none;
+            max-height: none;
+            border-radius: 0;
+        }
+
+        /* Window Title Bar */
+        .window-header {
+            background: #2d2d2d;
+            color: #ccc;
+            padding: 8px 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+            border-bottom: 1px solid #1a1a1a;
+        }
+        
+        .window-controls button {
+            background: transparent;
+            border: none;
+            color: #858585;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+        }
+        .window-controls button:hover {
+            background: rgba(255,255,255,0.1);
+            color: white;
+        }
+        .window-controls button.close:hover {
+            background: #e81123;
+            color: white;
+        }
+
+        /* Canvas Wrapper */
+        #turtle-canvas-wrapper {
+            flex-grow: 1;
+            overflow: auto; 
+            background-color: white;
+            background-image: linear-gradient(#f0f0f0 1px, transparent 1px), linear-gradient(90deg, #f0f0f0 1px, transparent 1px);
+            background-size: 20px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        #turtle-canvas {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            background-color: white; 
+            position: relative;
+        }
+
+        #turtle-canvas canvas {
+            background-color: transparent !important;
+        }
+    </style>
+</head>
+<body class="flex flex-col h-screen">
+
+    <header class="bg-[#333333] h-10 flex items-center justify-between px-3 shrink-0 text-sm select-none border-b border-[#252526] z-50">
+        <div class="flex items-center gap-4">
+            <!-- App Icon (VS Code Style) -->
+            <svg class="w-5 h-5 text-[#007acc]" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M20.2 3.6l-5.6-3a1 1 0 0 0-.9 0L2.2 6.6A1 1 0 0 0 2 7.5v9a1 1 0 0 0 .5.9l11.5 6.2a1 1 0 0 0 1 0l5.6-3a1 1 0 0 0 .4-.8v-15a1 1 0 0 0-.8-.9zm-6 15l-10-5.4V8.4l10 5.4v6zm1-7.2l-10-5.4 4.5-2.4 10 5.4-4.5 2.4zm5 2.7l-4 2.1v-6l4-2.1v6z"/>
+            </svg>
+            
+            <!-- Functional File Menu -->
+            <div class="flex space-x-1 text-[#cccccc] relative">
+                <div class="relative group">
+                    <span class="hover:bg-[#444444] px-2 py-1 rounded cursor-pointer" onclick="toggleFileMenu(event)">File</span>
+                    <!-- Dropdown -->
+                    <div id="file-menu" class="hidden absolute left-0 top-full mt-1 w-56 bg-[#252526] border border-[#3c3c3c] rounded shadow-xl z-50 flex-col py-1">
+                        <div class="px-4 py-1.5 hover:bg-[#007acc] cursor-pointer flex justify-between items-center" onclick="openFolder()">
+                            <span>Open Folder...</span>
+                        </div>
+                        <div class="border-t border-[#3c3c3c] my-1"></div>
+                        <div class="px-4 py-1.5 hover:bg-[#007acc] cursor-pointer flex justify-between items-center" onclick="saveFile()">
+                            <span>Save File</span>
+                            <span class="text-xs text-[#858585]">Ctrl+S</span>
+                        </div>
+                        <div class="border-t border-[#3c3c3c] my-1"></div>
+                        <div class="px-4 py-1.5 hover:bg-[#007acc] cursor-pointer flex justify-between items-center" onclick="newWindow()">
+                            <span>New Window</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="text-[#858585] text-xs absolute left-1/2 -translate-x-1/2 font-semibold">
+            VernCode Workspace
+        </div>
+        <div class="flex items-center gap-2">
+            <button onclick="runCode()" class="flex items-center gap-1.5 bg-[#007acc] hover:bg-[#005f9e] text-white px-3 py-1 rounded-md transition-colors text-xs font-medium">
+                <i class="ph-fill ph-play"></i> Run Script
+            </button>
+        </div>
+    </header>
+
+    <div class="flex-1 flex overflow-hidden">
+        
+        <!-- Sidebar (File Explorer) -->
+        <div class="w-60 bg-[#252526] flex flex-col shrink-0 border-r border-[#3c3c3c] select-none">
+            <div class="px-4 py-2 text-[11px] uppercase tracking-wider text-[#cccccc] font-semibold flex justify-between items-center mt-2 group">
+                Explorer
+                <!-- Workspace Actions -->
+                <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <i class="ph ph-file-plus text-sm hover:text-white cursor-pointer" onclick="showNewFileModal()" title="New File"></i>
+                    <i class="ph ph-folder-plus text-sm hover:text-white cursor-pointer" onclick="showNewFolderModal()" title="New Folder"></i>
+                </div>
+            </div>
+            
+            <div class="mt-2 flex flex-col overflow-y-auto" id="file-tree">
+                <!-- Empty State -->
+                <div class="px-4 py-4 text-xs text-[#858585] text-center leading-relaxed">
+                    You have not yet opened a folder.
+                </div>
+                <button onclick="openFolder()" class="mx-4 mt-2 bg-[#007acc] hover:bg-[#005f9e] transition-colors text-white px-2 py-1.5 rounded text-xs">
+                    Open Folder
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Editor Area -->
+        <div class="flex-1 flex flex-col bg-[#1e1e1e] min-w-0 relative">
+            <div class="h-9 bg-[#252526] flex shrink-0 border-b border-[#1e1e1e]" id="editor-tabs">
+                <div class="bg-[#1e1e1e] border-t border-[#007acc] px-4 flex items-center gap-2 text-sm text-[#cccccc] min-w-[150px] cursor-pointer relative group">
+                    <i class="ph-fill ph-file-code text-[#519aba]"></i>
+                    <span id="current-tab-name">untitled.py</span>
+                </div>
+            </div>
+
+            <!-- Editor Container -->
+            <div class="flex-1 relative w-full">
+                <div id="editor"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Terminal Resizer -->
+    <div id="terminal-resizer" class="h-1 bg-[#3c3c3c] hover:bg-[#007acc] cursor-row-resize shrink-0 transition-colors relative z-50">
+        <div class="absolute -top-1 -bottom-1 left-0 right-0"></div>
+    </div>
+
+    <!-- Integrated Terminal Panel -->
+    <div id="terminal-panel" class="bg-[#1e1e1e] flex flex-col shrink-0" style="height: 256px;">
+        <div class="flex items-center px-4 h-9 gap-6 text-[11px] uppercase tracking-wider text-[#858585] border-b border-[#2d2d2d]">
+            <span class="text-[#cccccc] border-b border-[#007acc] pb-[10px] pt-[10px] cursor-pointer flex items-center gap-1">
+                <i class="ph ph-terminal-window text-sm"></i> Terminal
+            </span>
+            <div class="ml-auto flex items-center gap-3">
+                <button onclick="clearTerminal()" class="hover:text-white transition-colors" title="Clear Terminal">
+                    <i class="ph ph-trash text-sm"></i>
+                </button>
+            </div>
+        </div>
+        <div class="flex-1 p-3 overflow-y-auto font-mono text-[13px] relative" id="terminal-container">
+            <pre id="output" class="text-[#cccccc] whitespace-pre-wrap m-0 leading-relaxed"></pre>
+        </div>
+    </div>
+
+    <!-- StatusBar -->
+    <div class="h-6 bg-[#007acc] text-white text-[11px] flex items-center px-3 justify-between shrink-0 select-none z-50">
+        <div class="flex items-center gap-4">
+            <span class="flex items-center gap-1"><i class="ph ph-git-branch"></i> main</span>
+        </div>
+        <div class="flex items-center gap-4">
+            <span id="status-indicator" class="flex items-center gap-1"><i class="ph ph-check-circle"></i> Ready</span>
+        </div>
+    </div>
+
+    <!-- Save Warning Modal -->
+    <div id="warning-modal-overlay" class="modal-overlay" style="display: flex;">
+        <div class="modal-box flex flex-col">
+            <div class="bg-[#333333] px-4 py-2 border-b border-[#3c3c3c] flex items-center gap-2 rounded-t-md">
+                <i class="ph-fill ph-warning-circle text-yellow-500 text-lg"></i>
+                <span class="font-semibold text-sm">Welcome to VernCode Workspace</span>
+            </div>
+            <div class="p-4 text-sm leading-relaxed text-[#cccccc]">
+                <p class="mb-3">This is a fully browser-based offline Python IDE.</p>
+                <p class="mb-4"><strong>Your work relies on local access.</strong> Click "File > Open Folder" and select a folder. VernCode will save your code directly into that folder.</p>
+                <p>If you close this tab without mounting a folder, your unsaved code will be lost.</p>
+            </div>
+            <div class="px-4 py-3 bg-[#2d2d2d] flex justify-end rounded-b-md border-t border-[#3c3c3c]">
+                <button onclick="closeWarningModal()" class="bg-[#007acc] hover:bg-[#005f9e] text-white px-4 py-1.5 rounded text-sm font-medium transition-colors">
+                    I Understand
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- New File Modal -->
+    <div id="new-file-modal" class="modal-overlay">
+        <div class="modal-box flex flex-col">
+            <div class="bg-[#333333] px-4 py-2 border-b border-[#3c3c3c] font-semibold text-sm rounded-t-md">
+                Create New File
+            </div>
+            <div class="p-4">
+                <input type="text" id="new-file-name" placeholder="filename.py" class="w-full bg-[#1e1e1e] border border-[#3c3c3c] rounded px-3 py-2 text-sm text-[#cccccc] focus:outline-none focus:border-[#007acc]">
+            </div>
+            <div class="px-4 py-3 bg-[#2d2d2d] flex justify-end gap-2 rounded-b-md border-t border-[#3c3c3c]">
+                <button onclick="hideNewFileModal()" class="px-4 py-1.5 rounded text-sm hover:bg-[#3c3c3c] transition-colors">Cancel</button>
+                <button onclick="createNewFile()" class="bg-[#007acc] hover:bg-[#005f9e] text-white px-4 py-1.5 rounded text-sm font-medium transition-colors">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Folder Modal -->
+    <div id="new-folder-modal" class="modal-overlay">
+        <div class="modal-box flex flex-col">
+            <div class="bg-[#333333] px-4 py-2 border-b border-[#3c3c3c] font-semibold text-sm rounded-t-md">
+                Create New Folder
+            </div>
+            <div class="p-4">
+                <input type="text" id="new-folder-name" placeholder="folder_name" class="w-full bg-[#1e1e1e] border border-[#3c3c3c] rounded px-3 py-2 text-sm text-[#cccccc] focus:outline-none focus:border-[#007acc]">
+            </div>
+            <div class="px-4 py-3 bg-[#2d2d2d] flex justify-end gap-2 rounded-b-md border-t border-[#3c3c3c]">
+                <button onclick="hideNewFolderModal()" class="px-4 py-1.5 rounded text-sm hover:bg-[#3c3c3c] transition-colors">Cancel</button>
+                <button onclick="createNewFolder()" class="bg-[#007acc] hover:bg-[#005f9e] text-white px-4 py-1.5 rounded text-sm font-medium transition-colors">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating Graphics Window Overlay -->
+    <div id="turtle-window-overlay">
+        <div id="turtle-window">
+            <div class="window-header">
+                <div class="flex items-center gap-2 text-sm font-semibold">
+                    <i class="ph-fill ph-turtle text-green-500"></i>
+                    <span id="turtle-window-title">Python Turtle Graphics</span>
+                </div>
+                <div class="window-controls flex gap-1">
+                    <button title="Minimize" onclick="closeTurtleWindow()">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M3 8h10v1H3z"/></svg>
+                    </button>
+                    <button title="Maximize" onclick="toggleMaximizeTurtleWindow()" id="maximize-btn">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M3 3h10v10H3V3zm1 1v8h8V4H4z"/></svg>
+                    </button>
+                    <button class="close" onclick="closeTurtleWindow()" title="Close">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>
+                    </button>
+                </div>
+            </div>
+            <div id="turtle-canvas-wrapper" tabindex="0" class="focus:outline-none">
+                <div id="turtle-canvas"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let editor;
+        
+        // Workspace State
+        let currentDirHandle = null;
+        let currentFileHandle = null;
+        let currentFilePath = null;
+        
+        // File Tree State
+        let folderHandleMap = new Map(); // Maps string paths to FileSystemDirectoryHandle
+        let expandedFolders = new Set(['/']);
+        let selectedFolderPath = '/';     // The folder currently selected by the user for new files
+        
+        window.VirtualFileSystem = {};
+
+        // Expose resolve hook for pure-python patching
+        window.resolveImagePath = function(filename) {
+            return window.VirtualFileSystem[filename] || filename;
+        };
+
+        window.checkVirtualFile = function(name) {
+            if (window.VirtualFileSystem[name] !== undefined) return true;
+            const lower = name.toLowerCase();
+            return Object.keys(window.VirtualFileSystem).some(k => k.toLowerCase() === lower);
+        };
+
+        window.readVirtualFile = function(name) {
+            if (window.VirtualFileSystem[name] !== undefined) return window.VirtualFileSystem[name];
+            const lower = name.toLowerCase();
+            const match = Object.keys(window.VirtualFileSystem).find(k => k.toLowerCase() === lower);
+            return match ? window.VirtualFileSystem[match] : "";
+        };
+
+        // Core syncing function - Pushes virtual file memory directly to Google Drive/Local physically!
+        window.updateVirtualFile = function(name, content) {
+            window.VirtualFileSystem[name] = content;
+            if (Sk.builtinFiles && Sk.builtinFiles.files) {
+                Sk.builtinFiles.files[name] = content;
+            }
+            
+            // To properly save dynamically generated files, we find the containing folder handle
+            if (currentDirHandle) {
+                let parts = name.split('/');
+                let fileName = parts.pop();
+                let dirPath = parts.length > 0 ? '/' + parts.join('/') + '/' : '/';
+                let dirHandle = folderHandleMap.get(dirPath) || currentDirHandle;
+                
+                dirHandle.getFileHandle(fileName, {create: true}).then(fileHandle => {
+                    fileHandle.createWritable().then(writable => {
+                        writable.write(content).then(() => writable.close());
+                    });
+                }).catch(err => console.log("Background save failed:", err));
+            }
+        };
+
+        window.onload = function() {
+            // Updated Ace Basepath for Offline
+            ace.config.set("basePath", "lib/ace/");
+            editor = ace.edit("editor");
+            editor.setTheme("ace/theme/tomorrow_night_eighties");
+            editor.session.setMode("ace/mode/python");
+            editor.setOptions({
+                fontSize: "14px",
+                showPrintMargin: false,
+                displayIndentGuides: true,
+                highlightActiveLine: true,
+                cursorStyle: "smooth",
+                scrollPastEnd: 0.5 
+            });
+            editor.setValue("", -1);
+
+            document.getElementById('turtle-canvas-wrapper').addEventListener('keydown', function(e) {
+                if(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].indexOf(e.key) > -1) e.preventDefault();
+            });
+
+            document.addEventListener('keydown', function(e) {
+                if ((window.navigator.platform.match("Mac") ? e.metaKey : e.ctrlKey) && e.key.toLowerCase() === 's') {
+                    e.preventDefault();
+                    saveFile(false);
+                }
+            });
+        };
+
+        function toggleFileMenu(e) {
+            e.stopPropagation();
+            const menu = document.getElementById('file-menu');
+            menu.classList.toggle('hidden');
+            menu.classList.toggle('flex');
+        }
+
+        document.addEventListener('click', () => {
+            const menu = document.getElementById('file-menu');
+            if (menu && !menu.classList.contains('hidden')) {
+                menu.classList.add('hidden');
+                menu.classList.remove('flex');
+            }
+        });
+
+        async function openFolder() {
+            try {
+                currentDirHandle = await window.showDirectoryPicker({ mode: "readwrite" });
+                selectedFolderPath = '/';
+                expandedFolders.clear();
+                expandedFolders.add('/');
+                await renderSidebar();
+                writeToTerminal(`[Workspace Loaded] ${currentDirHandle.name}\n`);
+            } catch (err) {
+                console.log("User cancelled folder selection or error:", err);
+            }
+        }
+
+        // Recursive Sidebar Rendering
+        async function renderSidebar() {
+            if (!currentDirHandle) return;
+            const fileTree = document.getElementById('file-tree');
+            fileTree.innerHTML = '';
+            folderHandleMap.clear();
+            folderHandleMap.set('/', currentDirHandle);
+            
+            // Render Root Folder
+            const rootDiv = document.createElement('div');
+            const isRootSelected = selectedFolderPath === '/';
+            rootDiv.className = `flex items-center px-4 py-1.5 gap-1 text-sm font-bold uppercase tracking-wider cursor-pointer whitespace-nowrap overflow-hidden text-ellipsis ${isRootSelected ? 'bg-[#37373d] text-white' : 'text-[#cccccc] hover:bg-[#2a2d2e]'}`;
+            rootDiv.innerHTML = `<i class="ph-fill ph-caret-down text-[10px]"></i> ${currentDirHandle.name}`;
+            rootDiv.onclick = (e) => {
+                e.stopPropagation();
+                selectedFolderPath = '/';
+                renderSidebar();
+            };
+            fileTree.appendChild(rootDiv);
+
+            // Render Contents
+            await renderLevel(currentDirHandle, '/', 0, fileTree);
+        }
+
+        async function renderLevel(dirHandle, pathPrefix, level, container) {
+            let entries = [];
+            for await (const entry of dirHandle.values()) {
+                entries.push(entry);
+            }
+            
+            // Sort: folders first, then files, alphabetically
+            entries.sort((a, b) => {
+                if (a.kind !== b.kind) return a.kind === 'directory' ? -1 : 1;
+                return a.name.localeCompare(b.name);
+            });
+
+            for (const entry of entries) {
+                const entryPath = pathPrefix + entry.name + (entry.kind === 'directory' ? '/' : '');
+                
+                const div = document.createElement('div');
+                const padding = level * 16 + 28; // Dynamic indentation
+                div.style.paddingLeft = padding + 'px';
+                
+                // SVG Icons for absolute offline reliability
+                const folderClosedSVG = `<svg class="w-4 h-4 text-[#dcb67a] shrink-0" fill="currentColor" viewBox="0 0 16 16"><path d="M1.5 3A1.5 1.5 0 0 1 3 1.5h3.2a1.5 1.5 0 0 1 1.06.44L8.5 3.2h4A1.5 1.5 0 0 1 14 4.7v7.6a1.5 1.5 0 0 1-1.5 1.5H3a1.5 1.5 0 0 1-1.5-1.5V3z"/></svg>`;
+                const folderOpenSVG = `<svg class="w-4 h-4 text-[#dcb67a] shrink-0" fill="currentColor" viewBox="0 0 16 16"><path d="M1.5 3A1.5 1.5 0 0 1 3 1.5h3.2a1.5 1.5 0 0 1 1.06.44L8.5 3.2h4A1.5 1.5 0 0 1 14 4.7v1.3l-1.4 5.3a1.5 1.5 0 0 1-1.45 1.12H2.66a1.5 1.5 0 0 1-1.45-1.12L0 6V3a1.5 1.5 0 0 1 1.5-1.5z"/></svg>`;
+                const pythonSVG = `<svg class="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7.9 1.2c-3.2 0-3.1 1.4-3.1 1.4l.0 1.3h3.2v.4H4.5s-2.2-.2-2.2 2.2c0 2.4 2.1 2.2 2.1 2.2h.7V7.5c0 0 0-1.4 1.4-1.4h2.2s1.4 0 1.4 1.4v2.1c0 0 0 1.3-1.3 1.3H7.5s-1.5 0-1.5-1.5H4.8s.1 3 3.3 3c3.2 0 3.2-1.3 3.2-1.3v-1.4H8s-1.4 0-1.4-1.4V6.4c0 0 0-1.4 1.4-1.4h2.2s2.1.2 2.1-2.2c0-2.4-2.1-2.2-2.1-2.2H7.9z" fill="#3572A5"/><path d="M5.3 2.2a.5.5 0 1 1 0 1 .5.5 0 0 1 0-1zm5.2 9.5a.5.5 0 1 1 0 1 .5.5 0 0 1 0-1z" fill="#FFC107"/></svg>`;
+                const imageSVG = `<svg class="w-4 h-4 text-[#a074c4] shrink-0" fill="currentColor" viewBox="0 0 16 16"><path d="M2 2a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H2zm0 1h12a1 1 0 0 1 1 1v5.6l-2.8-2.8a1.5 1.5 0 0 0-2.1 0L5.5 11.4 4.3 10.2a1.5 1.5 0 0 0-2.1 0L1 11.4V4a1 1 0 0 1 1-1zM5 4.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3z"/></svg>`;
+                const fileSVG = `<svg class="w-4 h-4 text-[#cccccc] shrink-0" fill="currentColor" viewBox="0 0 16 16"><path d="M4 1h6l4 4v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1zm5 1H4v12h9V6H9V2zM6 8h4v1H6V8zm0 2h4v1H6v-1z"/></svg>`;
+                
+                const caretRight = `<svg class="w-3 h-3 text-[#cccccc] shrink-0" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 3L11 8l-5.5 5v-10z"/></svg>`;
+                const caretDown = `<svg class="w-3 h-3 text-[#cccccc] shrink-0" fill="currentColor" viewBox="0 0 16 16"><path d="M3 5.5L8 11l5-5.5H3z"/></svg>`;
+
+                if (entry.kind === 'directory') {
+                    folderHandleMap.set(entryPath, entry);
+                    const isExpanded = expandedFolders.has(entryPath);
+                    const isSelected = selectedFolderPath === entryPath;
+                    
+                    div.className = `flex items-center py-1.5 pr-2 gap-1.5 text-[13px] cursor-pointer whitespace-nowrap overflow-hidden text-ellipsis ${isSelected ? 'bg-[#37373d] text-white' : 'text-[#cccccc] hover:bg-[#2a2d2e]'}`;
+                    div.innerHTML = `${isExpanded ? caretDown : caretRight} ${isExpanded ? folderOpenSVG : folderClosedSVG} <span>${entry.name}</span>`;
+                    
+                    div.onclick = (e) => {
+                        e.stopPropagation();
+                        selectedFolderPath = entryPath;
+                        if (isExpanded) expandedFolders.delete(entryPath);
+                        else expandedFolders.add(entryPath);
+                        renderSidebar();
+                    };
+                    container.appendChild(div);
+                    
+                    if (isExpanded) {
+                        await renderLevel(entry, entryPath, level + 1, container);
+                    }
+                } else {
+                    const isSelected = currentFilePath === entryPath;
+                    
+                    div.className = `flex items-center py-1.5 pr-2 gap-1.5 text-[13px] cursor-pointer whitespace-nowrap overflow-hidden text-ellipsis ${isSelected ? 'bg-[#37373d] text-white' : 'text-[#cccccc] hover:bg-[#2a2d2e]'}`;
+                    
+                    let iconHtml = fileSVG;
+                    if(entry.name.endsWith('.py')) iconHtml = pythonSVG;
+                    if(entry.name.match(/\.(gif|png|jpg|jpeg)$/i)) iconHtml = imageSVG;
+                    
+                    div.innerHTML = `<div class="w-3 h-3 shrink-0"></div> ${iconHtml} <span>${entry.name}</span>`;
+                    div.onclick = (e) => {
+                        e.stopPropagation();
+                        // Also set selected folder to parent folder when clicking a file
+                        selectedFolderPath = pathPrefix;
+                        loadFileToEditor(entry, entryPath);
+                        renderSidebar(); // Update highlighting
+                    };
+                    container.appendChild(div);
+                }
+            }
+        }
+
+        async function loadFileToEditor(fileHandle, filePath) {
+            try {
+                if (currentFileHandle) {
+                    let isSame = false;
+                    if (currentFileHandle.isSameEntry) isSame = await currentFileHandle.isSameEntry(fileHandle);
+                    else isSame = (currentFilePath === filePath);
+                    
+                    if (!isSame) await saveFile(true); 
+                    else return;
+                }
+
+                currentFileHandle = fileHandle;
+                currentFilePath = filePath;
+                const file = await fileHandle.getFile();
+                
+                // If it's an image, don't load binary into editor
+                if(file.name.match(/\.(gif|png|jpg|jpeg)$/i)) {
+                    editor.setValue("# Image files cannot be viewed in the text editor.\n# They can still be used in your code!", -1);
+                } else {
+                    const contents = await file.text();
+                    editor.setValue(contents, -1);
+                }
+
+                document.getElementById('current-tab-name').innerText = file.name;
+                
+                const status = document.getElementById("status-indicator");
+                status.innerHTML = `<i class="ph ph-check-circle text-green-400"></i> Opened ${file.name}`;
+                setTimeout(() => status.innerHTML = '<i class="ph ph-check-circle"></i> Ready', 3000);
+            } catch (err) {
+                writeToTerminal(`[Error] Failed to read file: ${err.message}\n`, true);
+            }
+        }
+
+        async function saveFile(silent = false) {
+            if (!currentFileHandle) {
+                if (!silent) writeToTerminal("[System] No active file to save. Open a workspace folder first.\n", true);
+                return;
+            }
+            if(currentFileHandle.name.match(/\.(gif|png|jpg|jpeg)$/i)) return; // Prevent overwriting images
+
+            try {
+                const status = document.getElementById("status-indicator");
+                status.innerHTML = '<i class="ph ph-spinner-gap animate-spin"></i> Saving...';
+                
+                const writable = await currentFileHandle.createWritable();
+                await writable.write(editor.getValue());
+                await writable.close();
+                
+                if(!silent) writeToTerminal(`[System] Saved ${currentFileHandle.name}\n`);
+                status.innerHTML = '<i class="ph ph-check-circle text-green-400"></i> Saved';
+                setTimeout(() => status.innerHTML = '<i class="ph ph-check-circle"></i> Ready', 3000);
+            } catch (err) {
+                writeToTerminal(`[Error] Failed to save file. Check permissions.\n`, true);
+            }
+        }
+
+        // Recursive Sync to load all files (including nested images) into VFS memory
+        async function syncWorkspaceFiles() {
+            if (!currentDirHandle) return;
+            window.VirtualFileSystem = {}; 
+            if (Sk.builtinFiles === undefined) Sk.builtinFiles = { files: {} };
+            
+            await syncDirectory(currentDirHandle, '/');
+        }
+
+        async function syncDirectory(dirHandle, pathPrefix) {
+            for await (const entry of dirHandle.values()) {
+                const entryPath = pathPrefix + entry.name;
+                if (entry.kind === 'file') {
+                    try {
+                        const file = await entry.getFile();
+                        if (file.name.match(/\.(py|txt|csv|json|md)$/i)) {
+                            const text = await file.text();
+                            window.VirtualFileSystem[entryPath] = text;
+                            window.VirtualFileSystem[entry.name] = text; // Alias for easy imports
+                            Sk.builtinFiles.files[entryPath] = text; 
+                            Sk.builtinFiles.files[entry.name] = text; 
+                        } 
+                        else if (file.name.match(/\.(gif|png|jpg|jpeg)$/i)) {
+                            const reader = new FileReader();
+                            const dataUrl = await new Promise((resolve) => {
+                                reader.onload = e => resolve(e.target.result);
+                                reader.readAsDataURL(file);
+                            });
+                            window.VirtualFileSystem[entryPath] = dataUrl;
+                            window.VirtualFileSystem[entry.name] = dataUrl; // Alias so addshape("test.gif") works immediately
+                        }
+                    } catch (e) {
+                        console.warn(`Could not sync ${entryPath}`, e);
+                    }
+                } else if (entry.kind === 'directory') {
+                    await syncDirectory(entry, entryPath + '/');
+                }
+            }
+        }
+
+        function showNewFileModal() {
+            if(!currentDirHandle) return alert("Please open a Workspace folder first!");
+            document.getElementById('new-file-name').value = '';
+            document.getElementById('new-file-modal').style.display = 'flex';
+            document.getElementById('new-file-name').focus();
+        }
+        function hideNewFileModal() { document.getElementById('new-file-modal').style.display = 'none'; }
+        
+        async function createNewFile() {
+            const nameInput = document.getElementById('new-file-name').value.trim();
+            if(!nameInput) return;
+            const finalName = nameInput.includes('.') ? nameInput : nameInput + '.py';
+            try {
+                // Get the handle for the currently selected folder
+                const targetDirHandle = folderHandleMap.get(selectedFolderPath) || currentDirHandle;
+                const newHandle = await targetDirHandle.getFileHandle(finalName, { create: true });
+                
+                expandedFolders.add(selectedFolderPath); // ensure parent folder is expanded
+                hideNewFileModal();
+                await renderSidebar();
+                
+                const newFilePath = selectedFolderPath + finalName;
+                await loadFileToEditor(newHandle, newFilePath);
+            } catch(e) {
+                writeToTerminal(`[Error] Could not create file.\n`, true);
+            }
+        }
+
+        function showNewFolderModal() {
+            if(!currentDirHandle) return alert("Please open a Workspace folder first!");
+            document.getElementById('new-folder-name').value = '';
+            document.getElementById('new-folder-modal').style.display = 'flex';
+            document.getElementById('new-folder-name').focus();
+        }
+        function hideNewFolderModal() { document.getElementById('new-folder-modal').style.display = 'none'; }
+        
+        async function createNewFolder() {
+            const nameInput = document.getElementById('new-folder-name').value.trim();
+            if(!nameInput) return;
+            try {
+                const targetDirHandle = folderHandleMap.get(selectedFolderPath) || currentDirHandle;
+                await targetDirHandle.getDirectoryHandle(nameInput, { create: true });
+                
+                expandedFolders.add(selectedFolderPath); 
+                hideNewFolderModal();
+                await renderSidebar();
+            } catch(e) {
+                writeToTerminal(`[Error] Could not create folder.\n`, true);
+            }
+        }
+
+        function newWindow() { window.open(window.location.href, '_blank'); }
+        function closeWarningModal() { document.getElementById('warning-modal-overlay').style.display = 'none'; }
+
+        function writeToTerminal(text, isError = false) {
+            const outputArea = document.getElementById("output");
+            let safeText = text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            if (isError) outputArea.innerHTML += `<span style="color: #f14c4c;">${safeText}</span>\n`;
+            else outputArea.innerHTML += safeText;
+            const container = document.getElementById("terminal-container");
+            container.scrollTop = container.scrollHeight;
+        }
+        function clearTerminal() { document.getElementById("output").innerHTML = ''; }
+
+        function builtinRead(x) {
+            if (window.VirtualFileSystem[x]) return window.VirtualFileSystem[x];
+            if (Sk.builtinFiles === undefined || Sk.builtinFiles["files"][x] === undefined) throw "File not found: '" + x + "'";
+            return Sk.builtinFiles["files"][x];
+        }
+
+        function openTurtleWindow() {
+            document.getElementById('turtle-window-title').innerText = "Python Turtle Graphics";
+            document.getElementById('turtle-window-overlay').style.display = 'flex';
+            setTimeout(() => document.getElementById('turtle-canvas-wrapper').focus(), 50);
+        }
+        function closeTurtleWindow() { document.getElementById('turtle-window-overlay').style.display = 'none'; }
+
+        let isMaximized = false;
+        function toggleMaximizeTurtleWindow() {
+            const win = document.getElementById('turtle-window');
+            const btn = document.getElementById('maximize-btn');
+            isMaximized = !isMaximized;
+            if (isMaximized) {
+                win.classList.add('maximized');
+                btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M3 5h8v8H3V5zm-1-1v10h10V4H2zm11 1h1v8h-1V5zm-1-2h2v10h-2V3z"/></svg>`;
+            } else {
+                win.classList.remove('maximized');
+                btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M3 3h10v10H3V3zm1 1v8h8V4H4z"/></svg>`; 
+            }
+        }
+
+        const terminalResizer = document.getElementById('terminal-resizer');
+        const terminalPanel = document.getElementById('terminal-panel');
+        let isResizing = false;
+
+        terminalResizer.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            document.body.style.cursor = 'row-resize';
+            document.getElementById('editor').style.pointerEvents = 'none'; 
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isResizing) return;
+            const newHeight = window.innerHeight - e.clientY - 24; 
+            if (newHeight > 36 && newHeight < window.innerHeight - 100) {
+                terminalPanel.style.height = newHeight + 'px';
+                if (editor) editor.resize();
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isResizing) {
+                isResizing = false;
+                document.body.style.cursor = 'default';
+                document.getElementById('editor').style.pointerEvents = 'auto'; 
+            }
+        });
+
+        async function runCode() {
+            await saveFile(true);
+            const status = document.getElementById("status-indicator");
+            status.innerHTML = '<i class="ph ph-spinner-gap animate-spin"></i> Syncing...';
+            
+            await syncWorkspaceFiles();
+            let safeProg = editor.getValue();
+
+            const canvasContainer = document.getElementById("turtle-canvas");
+            
+            clearTerminal();
+            canvasContainer.innerHTML = '';
+            window.vfsActiveTurtles = {};
+            
+            if (typeof Sk.sysmodules !== 'undefined') Sk.sysmodules = new Sk.builtin.dict();
+
+            let canvasW = 400;
+            let canvasH = 400;
+            const noCommentsProg = safeProg.replace(/#.*/g, '');
+            const setupRegex = /setup\s*\(\s*(?:width\s*=\s*)?(\d+)\s*(?:,\s*(?:height\s*=\s*)?(\d+))?\s*\)/;
+            const match = noCommentsProg.match(setupRegex);
+            if (match) {
+                canvasW = parseInt(match[1]);
+                canvasH = match[2] ? parseInt(match[2]) : canvasW;
+                writeToTerminal(`[System: Auto-sized turtle canvas to ${canvasW}x${canvasH}]\n`);
+            }
+            window.vfsCanvasW = canvasW;
+            window.vfsCanvasH = canvasH;
+            
+            if (safeProg.includes("import turtle") || safeProg.includes("from turtle")) {
+                openTurtleWindow();
+                document.getElementById('turtle-window').offsetHeight; 
+                canvasContainer.style.width = canvasW + 'px';
+                canvasContainer.style.height = canvasH + 'px';
+                Sk.TurtleGraphics = Sk.TurtleGraphics || {};
+                Sk.TurtleGraphics.target = 'turtle-canvas';
+                Sk.TurtleGraphics.width = canvasW;
+                Sk.TurtleGraphics.height = canvasH;
+            } else {
+                closeTurtleWindow();
+            }
+
+            status.innerHTML = '<i class="ph ph-spinner-gap animate-spin"></i> Running...';
+
+            if (!Sk.builtins) Sk.builtins = {};
+            Sk.builtins.vfs_check = new Sk.builtin.func(name => Sk.ffi.remapToPy(window.checkVirtualFile(Sk.ffi.remapToJs(name))));
+            Sk.builtins.vfs_read = new Sk.builtin.func(name => Sk.ffi.remapToPy(window.readVirtualFile(Sk.ffi.remapToJs(name))));
+            Sk.builtins.vfs_update = new Sk.builtin.func(function(name, content) {
+                window.updateVirtualFile(Sk.ffi.remapToJs(name), Sk.ffi.remapToJs(content));
+                return Sk.builtin.none.none$;
+            });
+            Sk.builtins.vfs_set_title = new Sk.builtin.func(function(t) {
+                const elem = document.getElementById('turtle-window-title');
+                if (elem) elem.innerText = Sk.ffi.remapToJs(t);
+                return Sk.builtin.none.none$;
+            });
+            Sk.builtins.vfs_resolve_image = new Sk.builtin.func(name => Sk.ffi.remapToPy(window.resolveImagePath(Sk.ffi.remapToJs(name))));
+            Sk.builtins.vfs_image_names = new Sk.builtin.func(function() {
+                const names = Object.keys(window.VirtualFileSystem).filter(n => /\.(gif|png|jpe?g)$/i.test(n));
+                return Sk.ffi.remapToPy(names);
+            });
+
+            // --- Custom image-shape overlay system ---
+            // Skulpt's built-in turtle.addshape()/shape() do not reliably accept
+            // raw image data in this build, so instead of registering a native
+            // shape we draw a real <img> element on top of the turtle canvas and
+            // keep it in sync with the turtle's position/heading ourselves.
+            Sk.builtins.vfs_turtle_set_image = new Sk.builtin.func(function(id, dataUrl, size) {
+                const jsId = Sk.ffi.remapToJs(id);
+                const jsUrl = Sk.ffi.remapToJs(dataUrl);
+                const jsSize = Sk.ffi.remapToJs(size);
+                const container = document.getElementById('turtle-canvas');
+                let img = document.getElementById('vfs-turtle-img-' + jsId);
+                if (!img) {
+                    img = document.createElement('img');
+                    img.id = 'vfs-turtle-img-' + jsId;
+                    img.style.position = 'absolute';
+                    img.style.pointerEvents = 'none';
+                    img.style.transformOrigin = 'center center';
+                    img.style.zIndex = '999';
+                    img.style.left = '50%';
+                    img.style.top = '50%';
+                    container.appendChild(img);
+                }
+                img.src = jsUrl;
+                img.style.width = jsSize + 'px';
+                img.style.height = 'auto';
+                img.style.display = 'block';
+                return Sk.builtin.none.none$;
+            });
+            Sk.builtins.vfs_turtle_update_pos = new Sk.builtin.func(function(id, x, y, heading, cw, ch) {
+                const jsId = Sk.ffi.remapToJs(id);
+                const jx = Sk.ffi.remapToJs(x);
+                const jy = Sk.ffi.remapToJs(y);
+                const jh = Sk.ffi.remapToJs(heading);
+                const jcw = Sk.ffi.remapToJs(cw);
+                const jch = Sk.ffi.remapToJs(ch);
+                const img = document.getElementById('vfs-turtle-img-' + jsId);
+                if (img) {
+                    const left = (jcw / 2) + jx;
+                    const top = (jch / 2) - jy;
+                    img.style.left = left + 'px';
+                    img.style.top = top + 'px';
+                    img.style.transform = 'translate(-50%, -50%) rotate(' + (-jh) + 'deg)';
+                }
+                return Sk.builtin.none.none$;
+            });
+            Sk.builtins.vfs_turtle_hide_image = new Sk.builtin.func(function(id) {
+                const jsId = Sk.ffi.remapToJs(id);
+                const img = document.getElementById('vfs-turtle-img-' + jsId);
+                if (img) img.style.display = 'none';
+                return Sk.builtin.none.none$;
+            });
+
+            // Register/unregister a turtle for continuous live-position polling.
+            // Skulpt animates moves frame-by-frame internally (even with tracer
+            // disabled), so syncing only once after a move call returns makes
+            // the pinned image lag/teleport. Polling reads the turtle's real
+            // xcor/ycor/heading every tick while a move is still animating.
+            window.vfsActiveTurtles = window.vfsActiveTurtles || {};
+            window.vfsCanvasW = window.vfsCanvasW || 400;
+            window.vfsCanvasH = window.vfsCanvasH || 400;
+            if (!window.vfsTurtlePollInterval) {
+                window.vfsTurtlePollInterval = setInterval(() => {
+                    for (const jsId of Object.keys(window.vfsActiveTurtles)) {
+                        const obj = window.vfsActiveTurtles[jsId];
+                        try {
+                            const x = Sk.ffi.remapToJs(Sk.misceval.callsimArray(obj.tp$getattr('xcor'), []));
+                            const y = Sk.ffi.remapToJs(Sk.misceval.callsimArray(obj.tp$getattr('ycor'), []));
+                            const h = Sk.ffi.remapToJs(Sk.misceval.callsimArray(obj.tp$getattr('heading'), []));
+                            const img = document.getElementById('vfs-turtle-img-' + jsId);
+                            if (img) {
+                                const left = (window.vfsCanvasW / 2) + x;
+                                const top = (window.vfsCanvasH / 2) - y;
+                                img.style.left = left + 'px';
+                                img.style.top = top + 'px';
+                                img.style.transform = 'translate(-50%, -50%) rotate(' + (-h) + 'deg)';
+                            }
+                        } catch (e) {
+                            delete window.vfsActiveTurtles[jsId];
+                        }
+                    }
+                }, 20);
+            }
+            Sk.builtins.vfs_register_turtle = new Sk.builtin.func(function(id, obj) {
+                window.vfsActiveTurtles[Sk.ffi.remapToJs(id)] = obj;
+                return Sk.builtin.none.none$;
+            });
+            Sk.builtins.vfs_unregister_turtle = new Sk.builtin.func(function(id) {
+                delete window.vfsActiveTurtles[Sk.ffi.remapToJs(id)];
+                return Sk.builtin.none.none$;
+            });
+
+            if (Sk.builtinFiles && Sk.builtinFiles.files) {
+                delete Sk.builtinFiles.files["src/builtin/os.js"];
+                Sk.builtinFiles.files["src/lib/os.py"] = `class _MockPath:\n    @staticmethod\n    def exists(path):\n        return vfs_check(path)\npath = _MockPath()`;
+            }
+
+            let patch = `class VFSFile:
+    def __init__(self, name, mode='r', encoding=None, *args, **kwargs):
+        self.name = name
+        self.mode = mode
+        if vfs_check(name):
+            self.content = str(vfs_read(name))
+            if 'w' in mode and '+' not in mode:
+                self.content = ""
+        else:
+            if 'r' in mode and '+' not in mode: raise FileNotFoundError("No such file: '" + name + "'")
+            self.content = ""
+    def read(self): return self.content
+    def readlines(self): return self.content.splitlines(True) if self.content else []
+    def write(self, text):
+        if 'r' in self.mode and '+' not in self.mode: raise IOError("Not open for writing")
+        if 'a' in self.mode: self.content += str(text)
+        else: self.content = str(text)
+        vfs_update(self.name, self.content)
+    def close(self): pass
+    def __enter__(self): return self
+    def __exit__(self, *args): pass
+open = VFSFile\n`;
+
+            if (safeProg.includes("import turtle") || safeProg.includes("from turtle")) {
+                patch += `import turtle
+try:
+    __screen = turtle.Screen()
+    __ScreenClass = type(__screen)
+    __CW = ${canvasW}
+    __CH = ${canvasH}
+
+    # addshape() on real image data is unreliable in this Skulpt build, so
+    # we no-op it for known virtual image files (custom overlay below
+    # handles rendering instead) and only defer to the native
+    # implementation for genuine polygon/compound shapes.
+    _orig_addshape = __ScreenClass.addshape
+
+    def _patched_addshape(self, name, shape=None):
+        if shape is None and vfs_check(name):
+            return None
+        try:
+            if shape is not None:
+                return _orig_addshape(self, name, shape)
+            return _orig_addshape(self, name)
+        except Exception:
+            return None
+
+    __ScreenClass.addshape = _patched_addshape
+    if hasattr(__ScreenClass, 'register_shape'):
+        __ScreenClass.register_shape = _patched_addshape
+    turtle.addshape = lambda *a, **k: _patched_addshape(__screen, *a, **k)
+    if hasattr(turtle, 'register_shape'):
+        turtle.register_shape = turtle.addshape
+
+    __T = turtle.Turtle
+
+    def _vfs_sync(self):
+        if getattr(self, '_vfs_img_active', False):
+            vfs_turtle_update_pos(id(self), self.xcor(), self.ycor(), self.heading(), __CW, __CH)
+
+    _orig_shape = __T.shape
+
+    def _patched_shape(self, name=None):
+        if name is None:
+            return _orig_shape(self)
+        if vfs_check(name):
+            resolved = vfs_read(name)
+            self._vfs_img_active = True
+            vfs_turtle_set_image(id(self), resolved, 40)
+            try:
+                self.hideturtle()
+            except Exception as e:
+                print("[VernCode] Warning: could not hide native cursor: " + str(e))
+            vfs_register_turtle(id(self), self)
+            _vfs_sync(self)
+            print("[VernCode] Applied image shape: " + name)
+            return None
+        else:
+            self._vfs_img_active = False
+            vfs_unregister_turtle(id(self))
+            vfs_turtle_hide_image(id(self))
+            try:
+                self.showturtle()
+            except Exception:
+                pass
+            try:
+                return _orig_shape(self, name)
+            except Exception as e:
+                print("[VernCode] shape('" + name + "') not found as a built-in shape or a synced image file.")
+                try:
+                    print("[VernCode] Known image files this run: " + str(list(vfs_image_names())))
+                except Exception:
+                    pass
+                print("[VernCode] Make sure the file is in your open workspace folder and the filename/case matches exactly.")
+                return None
+
+    __T.shape = _patched_shape
+
+    def _vfs_wrap(fn):
+        def inner(self, *a, **k):
+            result = fn(self, *a, **k)
+            _vfs_sync(self)
+            return result
+        return inner
+
+    for _mname in ("goto", "setpos", "forward", "fd", "backward", "bk", "back",
+                   "setheading", "seth", "left", "lt", "right", "rt", "circle"):
+        if hasattr(__T, _mname):
+            setattr(__T, _mname, _vfs_wrap(getattr(__T, _mname)))
+
+    __screen.setup = lambda *a, **k: None
+    turtle.setup = lambda *a, **k: None
+    
+    __T.shapesize = lambda self, *a, **k: None
+    __T.turtlesize = lambda self, *a, **k: None
+    turtle.shapesize = lambda *a, **k: None
+    
+    if hasattr(__screen, 'onkey') and not hasattr(__screen, 'onkeypress'): __screen.onkeypress = __screen.onkey
+    if hasattr(turtle, 'onkey') and not hasattr(turtle, 'onkeypress'): turtle.onkeypress = turtle.onkey
+    if hasattr(__screen, 'listen') and not hasattr(turtle, 'listen'): turtle.listen = __screen.listen
+    if not hasattr(__screen, 'onkeypress'): __screen.onkeypress = lambda *a, **k: None
+    if not hasattr(turtle, 'onkeypress'): turtle.onkeypress = lambda *a, **k: None
+    
+    turtle.tracer = lambda *a, **k: None
+    turtle.update = lambda *a, **k: None
+    __screen.tracer = lambda *a, **k: None
+    __screen.update = lambda *a, **k: None
+    
+    __screen.title = lambda t: vfs_set_title(t)
+    turtle.title = vfs_set_title
+except Exception as __vfs_patch_err:
+    print("[VernCode turtle patch warning]", __vfs_patch_err)\n`;
+            }
+
+            const patchLines = patch.split('\n').length - 1;
+            safeProg = patch + safeProg;
+
+            Sk.pre = "output";
+            Sk.configure({
+                output: function(text) { writeToTerminal(text, false); },
+                read: builtinRead,
+                __future__: Sk.python3, 
+                sysmodules: true, 
+                uncaughtException: function(err) {
+                    let errStr = err.toString();
+                    if (patchLines > 0) {
+                        errStr = errStr.replace(/on line (\d+)/g, (m, p1) => {
+                            const line = parseInt(p1);
+                            return line > patchLines ? 'on line ' + (line - patchLines) : 'on line ' + line + ' (internal)';
+                        });
+                    }
+                    writeToTerminal(errStr, true);
+                }
+            });
+
+            const myPromise = Sk.misceval.asyncToPromise(function() {
+                return Sk.importMainWithBody("<stdin>", false, safeProg, true);
+            });
+
+            myPromise.then(function(mod) {
+                status.innerHTML = '<i class="ph ph-check-circle text-green-400"></i> Done';
+                writeToTerminal("\n>>> Program exited gracefully.\n");
+                setTimeout(() => { status.innerHTML = '<i class="ph ph-check-circle"></i> Ready'; }, 3000);
+            }, function(err) {
+                status.innerHTML = '<i class="ph ph-warning-circle text-red-400"></i> Error';
+                let errStr = err.toString();
+                if (patchLines > 0) {
+                    errStr = errStr.replace(/on line (\d+)/g, (m, p1) => {
+                        const line = parseInt(p1);
+                        return line > patchLines ? 'on line ' + (line - patchLines) : 'on line ' + line + ' (internal)';
+                    });
+                }
+                writeToTerminal(`\nTraceback (most recent call last):\n  ${errStr}`, true);
+            });
+        }
+    </script>
+</body>
+</html>

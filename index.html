@@ -13,12 +13,12 @@
     <script src="lib/skulpt.min.js"></script>
     <script src="lib/skulpt-stdlib.js"></script>
 
+    <!-- EXTERNAL LIBRARIES -->
     <!-- Ace Editor -->
-    <script src="lib/ace/ace.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/ace.js"></script>
     
     <!-- Phosphor Icons for a clean VS Code look -->
-    <link rel="stylesheet" type="text/css" href="lib/phosphor/regular.css">
-    <link rel="stylesheet" type="text/css" href="lib/phosphor/fill.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
 
     <style>
         /* Base VS Code Colors */
@@ -363,6 +363,7 @@
                     <span id="turtle-window-title">Python Turtle Graphics</span>
                 </div>
                 <div class="window-controls flex gap-1">
+                    <!-- Pure SVGs used here to prevent missing icon bugs offline -->
                     <button title="Minimize" onclick="closeTurtleWindow()">
                         <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M3 8h10v1H3z"/></svg>
                     </button>
@@ -401,16 +402,11 @@
         };
 
         window.checkVirtualFile = function(name) {
-            if (window.VirtualFileSystem[name] !== undefined) return true;
-            const lower = name.toLowerCase();
-            return Object.keys(window.VirtualFileSystem).some(k => k.toLowerCase() === lower);
+            return window.VirtualFileSystem[name] !== undefined;
         };
 
         window.readVirtualFile = function(name) {
-            if (window.VirtualFileSystem[name] !== undefined) return window.VirtualFileSystem[name];
-            const lower = name.toLowerCase();
-            const match = Object.keys(window.VirtualFileSystem).find(k => k.toLowerCase() === lower);
-            return match ? window.VirtualFileSystem[match] : "";
+            return window.VirtualFileSystem[name] || "";
         };
 
         // Core syncing function - Pushes virtual file memory directly to Google Drive/Local physically!
@@ -436,8 +432,8 @@
         };
 
         window.onload = function() {
-            // Updated Ace Basepath for Offline
-            ace.config.set("basePath", "lib/ace/");
+            // Updated Ace Basepath to point to External CDN because lib/ is missing these files
+            ace.config.set("basePath", "https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/");
             editor = ace.edit("editor");
             editor.setTheme("ace/theme/tomorrow_night_eighties");
             editor.session.setMode("ace/mode/python");
@@ -503,7 +499,9 @@
             const rootDiv = document.createElement('div');
             const isRootSelected = selectedFolderPath === '/';
             rootDiv.className = `flex items-center px-4 py-1.5 gap-1 text-sm font-bold uppercase tracking-wider cursor-pointer whitespace-nowrap overflow-hidden text-ellipsis ${isRootSelected ? 'bg-[#37373d] text-white' : 'text-[#cccccc] hover:bg-[#2a2d2e]'}`;
-            rootDiv.innerHTML = `<i class="ph-fill ph-caret-down text-[10px]"></i> ${currentDirHandle.name}`;
+            
+            const caretDown = `<svg class="w-3 h-3 text-[#cccccc] shrink-0" fill="currentColor" viewBox="0 0 16 16"><path d="M3 5.5L8 11l5-5.5H3z"/></svg>`;
+            rootDiv.innerHTML = `${caretDown} ${currentDirHandle.name}`;
             rootDiv.onclick = (e) => {
                 e.stopPropagation();
                 selectedFolderPath = '/';
@@ -534,7 +532,7 @@
                 const padding = level * 16 + 28; // Dynamic indentation
                 div.style.paddingLeft = padding + 'px';
                 
-                // SVG Icons for absolute offline reliability
+                // Pure SVG Icons for absolute offline reliability
                 const folderClosedSVG = `<svg class="w-4 h-4 text-[#dcb67a] shrink-0" fill="currentColor" viewBox="0 0 16 16"><path d="M1.5 3A1.5 1.5 0 0 1 3 1.5h3.2a1.5 1.5 0 0 1 1.06.44L8.5 3.2h4A1.5 1.5 0 0 1 14 4.7v7.6a1.5 1.5 0 0 1-1.5 1.5H3a1.5 1.5 0 0 1-1.5-1.5V3z"/></svg>`;
                 const folderOpenSVG = `<svg class="w-4 h-4 text-[#dcb67a] shrink-0" fill="currentColor" viewBox="0 0 16 16"><path d="M1.5 3A1.5 1.5 0 0 1 3 1.5h3.2a1.5 1.5 0 0 1 1.06.44L8.5 3.2h4A1.5 1.5 0 0 1 14 4.7v1.3l-1.4 5.3a1.5 1.5 0 0 1-1.45 1.12H2.66a1.5 1.5 0 0 1-1.45-1.12L0 6V3a1.5 1.5 0 0 1 1.5-1.5z"/></svg>`;
                 const pythonSVG = `<svg class="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7.9 1.2c-3.2 0-3.1 1.4-3.1 1.4l.0 1.3h3.2v.4H4.5s-2.2-.2-2.2 2.2c0 2.4 2.1 2.2 2.1 2.2h.7V7.5c0 0 0-1.4 1.4-1.4h2.2s1.4 0 1.4 1.4v2.1c0 0 0 1.3-1.3 1.3H7.5s-1.5 0-1.5-1.5H4.8s.1 3 3.3 3c3.2 0 3.2-1.3 3.2-1.3v-1.4H8s-1.4 0-1.4-1.4V6.4c0 0 0-1.4 1.4-1.4h2.2s2.1.2 2.1-2.2c0-2.4-2.1-2.2-2.1-2.2H7.9z" fill="#3572A5"/><path d="M5.3 2.2a.5.5 0 1 1 0 1 .5.5 0 0 1 0-1zm5.2 9.5a.5.5 0 1 1 0 1 .5.5 0 0 1 0-1z" fill="#FFC107"/></svg>`;
@@ -807,12 +805,10 @@
             
             await syncWorkspaceFiles();
             let safeProg = editor.getValue();
-
             const canvasContainer = document.getElementById("turtle-canvas");
             
             clearTerminal();
-            canvasContainer.innerHTML = '';
-            window.vfsActiveTurtles = {};
+            canvasContainer.innerHTML = ''; 
             
             if (typeof Sk.sysmodules !== 'undefined') Sk.sysmodules = new Sk.builtin.dict();
 
@@ -826,8 +822,6 @@
                 canvasH = match[2] ? parseInt(match[2]) : canvasW;
                 writeToTerminal(`[System: Auto-sized turtle canvas to ${canvasW}x${canvasH}]\n`);
             }
-            window.vfsCanvasW = canvasW;
-            window.vfsCanvasH = canvasH;
             
             if (safeProg.includes("import turtle") || safeProg.includes("from turtle")) {
                 openTurtleWindow();
@@ -857,101 +851,6 @@
                 return Sk.builtin.none.none$;
             });
             Sk.builtins.vfs_resolve_image = new Sk.builtin.func(name => Sk.ffi.remapToPy(window.resolveImagePath(Sk.ffi.remapToJs(name))));
-            Sk.builtins.vfs_image_names = new Sk.builtin.func(function() {
-                const names = Object.keys(window.VirtualFileSystem).filter(n => /\.(gif|png|jpe?g)$/i.test(n));
-                return Sk.ffi.remapToPy(names);
-            });
-
-            // --- Custom image-shape overlay system ---
-            // Skulpt's built-in turtle.addshape()/shape() do not reliably accept
-            // raw image data in this build, so instead of registering a native
-            // shape we draw a real <img> element on top of the turtle canvas and
-            // keep it in sync with the turtle's position/heading ourselves.
-            Sk.builtins.vfs_turtle_set_image = new Sk.builtin.func(function(id, dataUrl, size) {
-                const jsId = Sk.ffi.remapToJs(id);
-                const jsUrl = Sk.ffi.remapToJs(dataUrl);
-                const jsSize = Sk.ffi.remapToJs(size);
-                const container = document.getElementById('turtle-canvas');
-                let img = document.getElementById('vfs-turtle-img-' + jsId);
-                if (!img) {
-                    img = document.createElement('img');
-                    img.id = 'vfs-turtle-img-' + jsId;
-                    img.style.position = 'absolute';
-                    img.style.pointerEvents = 'none';
-                    img.style.transformOrigin = 'center center';
-                    img.style.zIndex = '999';
-                    img.style.left = '50%';
-                    img.style.top = '50%';
-                    container.appendChild(img);
-                }
-                img.src = jsUrl;
-                img.style.width = jsSize + 'px';
-                img.style.height = 'auto';
-                img.style.display = 'block';
-                return Sk.builtin.none.none$;
-            });
-            Sk.builtins.vfs_turtle_update_pos = new Sk.builtin.func(function(id, x, y, heading, cw, ch) {
-                const jsId = Sk.ffi.remapToJs(id);
-                const jx = Sk.ffi.remapToJs(x);
-                const jy = Sk.ffi.remapToJs(y);
-                const jh = Sk.ffi.remapToJs(heading);
-                const jcw = Sk.ffi.remapToJs(cw);
-                const jch = Sk.ffi.remapToJs(ch);
-                const img = document.getElementById('vfs-turtle-img-' + jsId);
-                if (img) {
-                    const left = (jcw / 2) + jx;
-                    const top = (jch / 2) - jy;
-                    img.style.left = left + 'px';
-                    img.style.top = top + 'px';
-                    img.style.transform = 'translate(-50%, -50%) rotate(' + (-jh) + 'deg)';
-                }
-                return Sk.builtin.none.none$;
-            });
-            Sk.builtins.vfs_turtle_hide_image = new Sk.builtin.func(function(id) {
-                const jsId = Sk.ffi.remapToJs(id);
-                const img = document.getElementById('vfs-turtle-img-' + jsId);
-                if (img) img.style.display = 'none';
-                return Sk.builtin.none.none$;
-            });
-
-            // Register/unregister a turtle for continuous live-position polling.
-            // Skulpt animates moves frame-by-frame internally (even with tracer
-            // disabled), so syncing only once after a move call returns makes
-            // the pinned image lag/teleport. Polling reads the turtle's real
-            // xcor/ycor/heading every tick while a move is still animating.
-            window.vfsActiveTurtles = window.vfsActiveTurtles || {};
-            window.vfsCanvasW = window.vfsCanvasW || 400;
-            window.vfsCanvasH = window.vfsCanvasH || 400;
-            if (!window.vfsTurtlePollInterval) {
-                window.vfsTurtlePollInterval = setInterval(() => {
-                    for (const jsId of Object.keys(window.vfsActiveTurtles)) {
-                        const obj = window.vfsActiveTurtles[jsId];
-                        try {
-                            const x = Sk.ffi.remapToJs(Sk.misceval.callsimArray(obj.tp$getattr('xcor'), []));
-                            const y = Sk.ffi.remapToJs(Sk.misceval.callsimArray(obj.tp$getattr('ycor'), []));
-                            const h = Sk.ffi.remapToJs(Sk.misceval.callsimArray(obj.tp$getattr('heading'), []));
-                            const img = document.getElementById('vfs-turtle-img-' + jsId);
-                            if (img) {
-                                const left = (window.vfsCanvasW / 2) + x;
-                                const top = (window.vfsCanvasH / 2) - y;
-                                img.style.left = left + 'px';
-                                img.style.top = top + 'px';
-                                img.style.transform = 'translate(-50%, -50%) rotate(' + (-h) + 'deg)';
-                            }
-                        } catch (e) {
-                            delete window.vfsActiveTurtles[jsId];
-                        }
-                    }
-                }, 20);
-            }
-            Sk.builtins.vfs_register_turtle = new Sk.builtin.func(function(id, obj) {
-                window.vfsActiveTurtles[Sk.ffi.remapToJs(id)] = obj;
-                return Sk.builtin.none.none$;
-            });
-            Sk.builtins.vfs_unregister_turtle = new Sk.builtin.func(function(id) {
-                delete window.vfsActiveTurtles[Sk.ffi.remapToJs(id)];
-                return Sk.builtin.none.none$;
-            });
 
             if (Sk.builtinFiles && Sk.builtinFiles.files) {
                 delete Sk.builtinFiles.files["src/builtin/os.js"];
@@ -985,89 +884,31 @@ open = VFSFile\n`;
                 patch += `import turtle
 try:
     __screen = turtle.Screen()
-    __ScreenClass = type(__screen)
-    __CW = ${canvasW}
-    __CH = ${canvasH}
+    _old_add = turtle.addshape
+    
+    def _new_add(*args):
+        if not args: return
+        idx = 0
+        if hasattr(args[0], 'addshape') and not isinstance(args[0], str):
+            idx = 1
+        if len(args) <= idx: return
+        
+        name = args[idx]
+        resolved = vfs_resolve_image(name)
+        
+        if len(args) == idx + 1:
+            return _old_add(resolved)
+        return _old_add(resolved, args[idx + 1])
 
-    # addshape() on real image data is unreliable in this Skulpt build, so
-    # we no-op it for known virtual image files (custom overlay below
-    # handles rendering instead) and only defer to the native
-    # implementation for genuine polygon/compound shapes.
-    _orig_addshape = __ScreenClass.addshape
-
-    def _patched_addshape(self, name, shape=None):
-        if shape is None and vfs_check(name):
-            return None
-        try:
-            if shape is not None:
-                return _orig_addshape(self, name, shape)
-            return _orig_addshape(self, name)
-        except Exception:
-            return None
-
-    __ScreenClass.addshape = _patched_addshape
-    if hasattr(__ScreenClass, 'register_shape'):
-        __ScreenClass.register_shape = _patched_addshape
-    turtle.addshape = lambda *a, **k: _patched_addshape(__screen, *a, **k)
+    __screen.addshape = _new_add
+    if hasattr(__screen, 'register_shape'):
+        __screen.register_shape = _new_add
+        
+    turtle.addshape = _new_add
     if hasattr(turtle, 'register_shape'):
-        turtle.register_shape = turtle.addshape
+        turtle.register_shape = _new_add
 
     __T = turtle.Turtle
-
-    def _vfs_sync(self):
-        if getattr(self, '_vfs_img_active', False):
-            vfs_turtle_update_pos(id(self), self.xcor(), self.ycor(), self.heading(), __CW, __CH)
-
-    _orig_shape = __T.shape
-
-    def _patched_shape(self, name=None):
-        if name is None:
-            return _orig_shape(self)
-        if vfs_check(name):
-            resolved = vfs_read(name)
-            self._vfs_img_active = True
-            vfs_turtle_set_image(id(self), resolved, 40)
-            try:
-                self.hideturtle()
-            except Exception as e:
-                print("[VernCode] Warning: could not hide native cursor: " + str(e))
-            vfs_register_turtle(id(self), self)
-            _vfs_sync(self)
-            print("[VernCode] Applied image shape: " + name)
-            return None
-        else:
-            self._vfs_img_active = False
-            vfs_unregister_turtle(id(self))
-            vfs_turtle_hide_image(id(self))
-            try:
-                self.showturtle()
-            except Exception:
-                pass
-            try:
-                return _orig_shape(self, name)
-            except Exception as e:
-                print("[VernCode] shape('" + name + "') not found as a built-in shape or a synced image file.")
-                try:
-                    print("[VernCode] Known image files this run: " + str(list(vfs_image_names())))
-                except Exception:
-                    pass
-                print("[VernCode] Make sure the file is in your open workspace folder and the filename/case matches exactly.")
-                return None
-
-    __T.shape = _patched_shape
-
-    def _vfs_wrap(fn):
-        def inner(self, *a, **k):
-            result = fn(self, *a, **k)
-            _vfs_sync(self)
-            return result
-        return inner
-
-    for _mname in ("goto", "setpos", "forward", "fd", "backward", "bk", "back",
-                   "setheading", "seth", "left", "lt", "right", "rt", "circle"):
-        if hasattr(__T, _mname):
-            setattr(__T, _mname, _vfs_wrap(getattr(__T, _mname)))
-
     __screen.setup = lambda *a, **k: None
     turtle.setup = lambda *a, **k: None
     
@@ -1088,8 +929,7 @@ try:
     
     __screen.title = lambda t: vfs_set_title(t)
     turtle.title = vfs_set_title
-except Exception as __vfs_patch_err:
-    print("[VernCode turtle patch warning]", __vfs_patch_err)\n`;
+except Exception: pass\n`;
             }
 
             const patchLines = patch.split('\n').length - 1;

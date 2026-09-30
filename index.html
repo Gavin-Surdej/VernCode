@@ -220,9 +220,12 @@
                 </div>
             </div>
         </div>
+        
+        <!-- VISUAL INDICATOR TO CONFIRM GITHUB DEPLOYMENT -->
         <div class="text-[#858585] text-xs absolute left-1/2 -translate-x-1/2 font-semibold">
-            VernCode Workspace
+            VernCode Workspace - V2
         </div>
+        
         <div class="flex items-center gap-2">
             <button onclick="runCode()" class="flex items-center gap-1.5 bg-[#007acc] hover:bg-[#005f9e] text-white px-3 py-1 rounded-md transition-colors text-xs font-medium">
                 <i class="ph-fill ph-play"></i> Run Script
@@ -409,7 +412,7 @@
             return window.VirtualFileSystem[name] || "";
         };
 
-        // Core syncing function - Pushes virtual file memory directly to Google Drive/Local physically!
+        // Core syncing function - Pushes virtual file memory directly to Local physically!
         window.updateVirtualFile = function(name, content) {
             window.VirtualFileSystem[name] = content;
             if (Sk.builtinFiles && Sk.builtinFiles.files) {
@@ -432,7 +435,7 @@
         };
 
         window.onload = function() {
-            // Updated Ace Basepath to point to External CDN because lib/ is missing these files
+            // Updated Ace Basepath to point to External CDN 
             ace.config.set("basePath", "https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/");
             editor = ace.edit("editor");
             editor.setTheme("ace/theme/tomorrow_night_eighties");

@@ -883,52 +883,50 @@ open = VFSFile\n`;
             if (safeProg.includes("import turtle") || safeProg.includes("from turtle")) {
                 patch += `import turtle
 try:
-    __screen = turtle.Screen()
-    _old_add = turtle.addshape
+    _screen = turtle.Screen()
+    _T = turtle.Turtle
     
-    def _new_add(*args):
-        if not args: return
-        idx = 0
-        if hasattr(args[0], 'addshape') and not isinstance(args[0], str):
-            idx = 1
-        if len(args) <= idx: return
+    # 1. Map all Screen methods to the global turtle module (Standard CPython behavior)
+    _screen_methods = ['listen', 'onkey', 'onkeypress', 'onscreenclick', 'onclick', 'ontimer', 'mainloop', 'done', 'tracer', 'update', 'bgcolor', 'bgpic', 'clearscreen', 'resetscreen', 'screensize', 'setworldcoordinates', 'window_height', 'window_width']
+    for _m in _screen_methods:
+        if hasattr(_screen, _m):
+            setattr(turtle, _m, getattr(_screen, _m))
+            
+    # 2. Add specific fallbacks for keyboard bindings (Skulpt uses onkey for both)
+    if hasattr(_screen, 'onkey') and not hasattr(turtle, 'onkeypress'):
+        turtle.onkeypress = getattr(_screen, 'onkey')
         
-        name = args[idx]
-        resolved = vfs_resolve_image(name)
+    # Dummy fallbacks to prevent crashes if functions are completely missing
+    if not hasattr(turtle, 'listen'): turtle.listen = lambda *a, **k: None
+    if not hasattr(turtle, 'onkeypress'): turtle.onkeypress = lambda *a, **k: None
+    if not hasattr(turtle, 'tracer'): turtle.tracer = lambda *a, **k: None
+    if not hasattr(turtle, 'update'): turtle.update = lambda *a, **k: None
+    if not hasattr(_screen, 'tracer'): _screen.tracer = lambda *a, **k: None
+    if not hasattr(_screen, 'update'): _screen.update = lambda *a, **k: None
         
-        if len(args) == idx + 1:
-            return _old_add(resolved)
-        return _old_add(resolved, args[idx + 1])
-
-    __screen.addshape = _new_add
-    if hasattr(__screen, 'register_shape'):
-        __screen.register_shape = _new_add
-        
-    turtle.addshape = _new_add
-    if hasattr(turtle, 'register_shape'):
-        turtle.register_shape = _new_add
-
-    __T = turtle.Turtle
-    __screen.setup = lambda *a, **k: None
-    turtle.setup = lambda *a, **k: None
-    
-    __T.shapesize = lambda self, *a, **k: None
-    __T.turtlesize = lambda self, *a, **k: None
+    # 3. Override shapesize/turtlesize (often buggy in web ports)
+    _T.shapesize = lambda self, *a, **k: None
+    _T.turtlesize = lambda self, *a, **k: None
     turtle.shapesize = lambda *a, **k: None
     
-    if hasattr(__screen, 'onkey') and not hasattr(__screen, 'onkeypress'): __screen.onkeypress = __screen.onkey
-    if hasattr(turtle, 'onkey') and not hasattr(turtle, 'onkeypress'): turtle.onkeypress = turtle.onkey
-    if hasattr(__screen, 'listen') and not hasattr(turtle, 'listen'): turtle.listen = __screen.listen
-    if not hasattr(__screen, 'onkeypress'): __screen.onkeypress = lambda *a, **k: None
-    if not hasattr(turtle, 'onkeypress'): turtle.onkeypress = lambda *a, **k: None
-    
-    turtle.tracer = lambda *a, **k: None
-    turtle.update = lambda *a, **k: None
-    __screen.tracer = lambda *a, **k: None
-    __screen.update = lambda *a, **k: None
-    
-    __screen.title = lambda t: vfs_set_title(t)
+    # 4. Fix setup and title overrides
+    _screen.setup = lambda *a, **k: None
+    turtle.setup = lambda *a, **k: None
+    _screen.title = lambda t: vfs_set_title(t)
     turtle.title = vfs_set_title
+    
+    # 5. Adaptive args fix for addshape
+    _S_cls = type(_screen)
+    _old_add = getattr(_S_cls, 'addshape', getattr(_S_cls, 'register_shape', None))
+    if _old_add:
+        def _new_add(self, *args):
+            if not args: return _old_add(self)
+            resolved_img = vfs_resolve_image(args[0])
+            return _old_add(self, resolved_img, *args[1:])
+        _S_cls.addshape = _new_add
+        _S_cls.register_shape = _new_add
+        turtle.addshape = lambda *args: _new_add(_screen, *args)
+        turtle.register_shape = lambda *args: _new_add(_screen, *args)
 except Exception: pass\n`;
             }
 

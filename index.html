@@ -796,8 +796,7 @@
                 document.getElementById('editor').style.pointerEvents = 'auto'; 
             }
         });
-
-        async function runCode() {
+async function runCode() {
             await saveFile(true);
             const status = document.getElementById("status-indicator");
             status.innerHTML = '<i class="ph ph-spinner-gap animate-spin"></i> Syncing...';
@@ -859,11 +858,6 @@
                 return Sk.ffi.remapToPy(names);
             });
 
-            // --- Custom image-shape overlay system ---
-            // Skulpt's built-in turtle.addshape()/shape() do not reliably accept
-            // raw image data in this build, so instead of registering a native
-            // shape we draw a real <img> element on top of the turtle canvas and
-            // keep it in sync with the turtle's position/heading ourselves.
             Sk.builtins.vfs_turtle_set_image = new Sk.builtin.func(function(id, dataUrl, size) {
                 const jsId = Sk.ffi.remapToJs(id);
                 const jsUrl = Sk.ffi.remapToJs(dataUrl);
@@ -911,11 +905,6 @@
                 return Sk.builtin.none.none$;
             });
 
-            // Register/unregister a turtle for continuous live-position polling.
-            // Skulpt animates moves frame-by-frame internally (even with tracer
-            // disabled), so syncing only once after a move call returns makes
-            // the pinned image lag/teleport. Polling reads the turtle's real
-            // xcor/ycor/heading every tick while a move is still animating.
             window.vfsActiveTurtles = window.vfsActiveTurtles || {};
             window.vfsCanvasW = window.vfsCanvasW || 400;
             window.vfsCanvasH = window.vfsCanvasH || 400;
@@ -986,10 +975,25 @@ try:
     __CW = ${canvasW}
     __CH = ${canvasH}
 
-    # addshape() on real image data is unreliable in this Skulpt build, so
-    # we no-op it for known virtual image files (custom overlay below
-    # handles rendering instead) and only defer to the native
-    # implementation for genuine polygon/compound shapes.
+    # --- FORCED VS CODE COMPATIBILITY ALIASES ---
+    _safe_pass = lambda *a, **k: None
+
+    if not hasattr(__ScreenClass, 'onkeypress'): __ScreenClass.onkeypress = getattr(__ScreenClass, 'onkey', _safe_pass)
+    if not hasattr(__ScreenClass, 'onkeyrelease'): __ScreenClass.onkeyrelease = getattr(__ScreenClass, 'onkey', _safe_pass)
+    if not hasattr(__ScreenClass, 'tracer'): __ScreenClass.tracer = _safe_pass
+    if not hasattr(__ScreenClass, 'update'): __ScreenClass.update = _safe_pass
+    if not hasattr(__ScreenClass, 'listen'): __ScreenClass.listen = _safe_pass
+    if not hasattr(__ScreenClass, 'mainloop'): __ScreenClass.mainloop = _safe_pass
+    if not hasattr(__ScreenClass, 'done'): __ScreenClass.done = _safe_pass
+
+    if not hasattr(turtle, 'onkeypress'): turtle.onkeypress = getattr(turtle, 'onkey', getattr(__ScreenClass, 'onkey', _safe_pass))
+    if not hasattr(turtle, 'onkeyrelease'): turtle.onkeyrelease = getattr(turtle, 'onkey', getattr(__ScreenClass, 'onkey', _safe_pass))
+    if not hasattr(turtle, 'tracer'): turtle.tracer = _safe_pass
+    if not hasattr(turtle, 'update'): turtle.update = _safe_pass
+    if not hasattr(turtle, 'listen'): turtle.listen = getattr(__ScreenClass, 'listen', _safe_pass)
+    if not hasattr(turtle, 'mainloop'): turtle.mainloop = _safe_pass
+    if not hasattr(turtle, 'done'): turtle.done = _safe_pass
+
     _orig_addshape = __ScreenClass.addshape
 
     def _patched_addshape(self, name, shape=None):
@@ -1027,10 +1031,9 @@ try:
             try:
                 self.hideturtle()
             except Exception as e:
-                print("[VernCode] Warning: could not hide native cursor: " + str(e))
+                pass
             vfs_register_turtle(id(self), self)
             _vfs_sync(self)
-            print("[VernCode] Applied image shape: " + name)
             return None
         else:
             self._vfs_img_active = False
@@ -1043,12 +1046,7 @@ try:
             try:
                 return _orig_shape(self, name)
             except Exception as e:
-                print("[VernCode] shape('" + name + "') not found as a built-in shape or a synced image file.")
-                try:
-                    print("[VernCode] Known image files this run: " + str(list(vfs_image_names())))
-                except Exception:
-                    pass
-                print("[VernCode] Make sure the file is in your open workspace folder and the filename/case matches exactly.")
+                print("[VernCode] shape('" + name + "') not found.")
                 return None
 
     __T.shape = _patched_shape
@@ -1067,22 +1065,9 @@ try:
 
     __screen.setup = lambda *a, **k: None
     turtle.setup = lambda *a, **k: None
-    
     __T.shapesize = lambda self, *a, **k: None
     __T.turtlesize = lambda self, *a, **k: None
     turtle.shapesize = lambda *a, **k: None
-    
-    if hasattr(__screen, 'onkey') and not hasattr(__screen, 'onkeypress'): __screen.onkeypress = __screen.onkey
-    if hasattr(turtle, 'onkey') and not hasattr(turtle, 'onkeypress'): turtle.onkeypress = turtle.onkey
-    if hasattr(__screen, 'listen') and not hasattr(turtle, 'listen'): turtle.listen = __screen.listen
-    if not hasattr(__screen, 'onkeypress'): __screen.onkeypress = lambda *a, **k: None
-    if not hasattr(turtle, 'onkeypress'): turtle.onkeypress = lambda *a, **k: None
-    
-    turtle.tracer = lambda *a, **k: None
-    turtle.update = lambda *a, **k: None
-    __screen.tracer = lambda *a, **k: None
-    __screen.update = lambda *a, **k: None
-    
     __screen.title = lambda t: vfs_set_title(t)
     turtle.title = vfs_set_title
 except Exception as __vfs_patch_err:
